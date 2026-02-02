@@ -18,7 +18,8 @@
                                 $count: true,
                                     $$updateGroupId : 'peopleGroup'
                                 }
-                            }">
+                            }"
+                            mode="SingleSelectLeft">
                             <headerToolbar>
                                 <OverflowToolbar>
                                     <content>
@@ -37,6 +38,16 @@
                                             <layoutData>
                                                 <OverflowToolbarLayoutData priority="NeverOverflow"/>
                                             </layoutData>
+                                        </Button>
+
+                                        <Button
+                                          id="deleteUserButton"
+                                          icon="sap-icon://delete"
+                                          tooltip="{i18n>deleteButtonText}"
+                                          press=".onDelete">
+                                          <layoutData>
+                                            <OverflowToolbarLayoutData priority="NeverOverflow"/>
+                                          </layoutData>
                                         </Button>
 
                                         <Button
@@ -143,3 +154,12 @@ Step 6
 * - Implementata la validazione live sui campi Input tramite 'liveChange'.
 * - Rafforzata la logica del pulsante Save: abilitato solo se lo UserName è presente e non vi sono errori tecnici nel MessageModel.
 * - Disabilitate le azioni di navigazione (Search, Sort, Refresh) durante l'editing per garantire l'integrità dei dati pendenti.-->
+
+<!--
+Step 7
+* - Aggiunto il metodo 'onDelete' per gestire la rimozione dei record selezionati.
+* - La tabella è stata impostata in modalità 'SingleSelectLeft' per permettere 
+* l'identificazione univoca del contesto (Binding Context) da eliminare.
+* - L'operazione di cancellazione invoca il metodo .delete() direttamente sul 
+* contesto selezionato, sincronizzandosi automaticamente con il backend.
+-->
