@@ -15,6 +15,20 @@
 							items="{
 								path: '/People'
 							}">
+
+              <headerToolbar>
+                <OverflowToolbar>
+                  <content>
+                    <ToolbarSpacer/>
+                    <Button
+                      id="refreshUsersButton"
+                      icon="sap-icon://refresh"
+                      tooltip="{i18n>refreshButtonText}"
+                      press=".onRefresh"/>
+                  </content>
+                </OverflowToolbar>
+              </headerToolbar>
+
 							<columns>
 								<Column id="userNameColumn">
 									<Text text="{i18n>userNameLabelText}"/>
@@ -52,3 +66,9 @@
 		</App>
 	</Shell>
 </mvc:View>
+
+<!--
+* Inseriamo una 'headerToolbar' all'interno della tabella con un singolo pulsante (Button).
+* Il pulsante è configurato con un evento 'press' a cui colleghiamo il gestore eventi 'onRefresh'
+* definito nel controller, permettendo all'utente di sincronizzare manualmente i dati con il server.
+-->
