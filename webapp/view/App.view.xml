@@ -13,22 +13,33 @@
 							growing="true"
 							growingThreshold="10"
 							items="{
-								path: '/People'
+								path: '/People',
+								parameters: {
+									$count: true
+								}
 							}">
-
-              <headerToolbar>
-                <OverflowToolbar>
-                  <content>
-                    <ToolbarSpacer/>
-                    <Button
-                      id="refreshUsersButton"
-                      icon="sap-icon://refresh"
-                      tooltip="{i18n>refreshButtonText}"
-                      press=".onRefresh"/>
-                  </content>
-                </OverflowToolbar>
-              </headerToolbar>
-
+							<headerToolbar>
+								<OverflowToolbar>
+									<content>
+										<ToolbarSpacer/>
+										<SearchField
+											id="searchField"
+											width="20%"
+											placeholder="{i18n>searchFieldPlaceholder}"
+											search=".onSearch"/>
+										<Button
+											id="refreshUsersButton"
+											icon="sap-icon://refresh"
+											tooltip="{i18n>refreshButtonText}"
+											press=".onRefresh"/>
+										<Button
+											id="sortUsersButton"
+											icon="sap-icon://sort"
+											tooltip="{i18n>sortButtonText}"
+											press="onSort"/>
+									</content>
+								</OverflowToolbar>
+							</headerToolbar>
 							<columns>
 								<Column id="userNameColumn">
 									<Text text="{i18n>userNameLabelText}"/>
@@ -67,8 +78,19 @@
 	</Shell>
 </mvc:View>
 
+
 <!--
+Step 3
 * Inseriamo una 'headerToolbar' all'interno della tabella con un singolo pulsante (Button).
 * Il pulsante è configurato con un evento 'press' a cui colleghiamo il gestore eventi 'onRefresh'
 * definito nel controller, permettendo all'utente di sincronizzare manualmente i dati con il server.
+-->
+
+<!--
+Step 5
+Abbiamo aggiunto il parametro 
+* '$count: true' al binding per ricevere dal service
+* il numero totale di entità, visualizzabile sotto il pulsante 'More'. 
+* Nella 'OverflowToolbar' sono stati inseriti un campo di ricerca (SearchField) e un pulsante di ordinamento (Sort Button), collegandoli ai rispettivi 
+* gestori eventi nel controller.
 -->

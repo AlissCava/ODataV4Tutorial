@@ -10,4 +10,3 @@ Protocollo:** OData V4 (REST / HTTP).
 Connessione:** Consumo di un servizio OData V4 tramite Model specifico in SAPUI5.
 
 **Display:** Binding dei dati su controlli di lista/tabella.
-
