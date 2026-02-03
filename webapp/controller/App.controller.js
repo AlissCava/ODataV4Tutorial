@@ -205,18 +205,29 @@ sap.ui.define(
         this._setUIChanges();
       },
 
-      onResetDataSource : function () {
-			var oModel = this.getView().getModel(),
-				oOperation = oModel.bindContext("/ResetDataSource(...)");
-
-        oOperation.invoke().then(function () {
-            oModel.refresh();
-            MessageToast.show(this._getText("sourceResetSuccessMessage"));
-          }.bind(this), function (oError) {
-            MessageBox.error(oError.message);
+      // Reset del DataSource lato backend
+      onResetDataSource : function () {     
+        // Recupera il modello OData principale
+        var oModel = this.getView().getModel(),
+        // Binding verso l’operazione ResetDataSource (function/action OData)
+        oOperation = oModel.bindContext("/ResetDataSource(...)");
+        // Invoca l’operazione sul server
+        oOperation.invoke().then(
+          // Callback in caso di successo
+          function () {
+              // Aggiorna i dati dal backend
+              oModel.refresh();
+              // Messaggio di conferma
+              MessageToast.show(this._getText("sourceResetSuccessMessage"));
+          }.bind(this),
+          // Callback in caso di errore
+          function (oError) {
+              // Mostra errore
+              MessageBox.error(oError.message);
           }
         );
-		  },
+      },
+
 
       // Salvataggio modifiche (batch)
       onSave: function () {
