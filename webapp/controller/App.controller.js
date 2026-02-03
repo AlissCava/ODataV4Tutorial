@@ -1,284 +1,299 @@
-sap.ui.define(
-  [
-    // Gestione centralizzata dei messaggi OData
-    "sap/ui/core/Messaging",
-    // Controller base MVC
-    "sap/ui/core/mvc/Controller",
-    // Modello JSON per stato UI
-    "sap/ui/model/json/JSONModel",
-    // Popup per messaggi di errore
-    "sap/m/MessageBox",
-    // Ordinamento liste
-    "sap/ui/model/Sorter",
-    // Filtri sui dati
-    "sap/ui/model/Filter",
-    // Operatori dei filtri
-    "sap/ui/model/FilterOperator",
-    // Tipo di filtro
-    "sap/ui/model/FilterType",
-  ],
-  function (Messaging, Controller, MessageToast, MessageBox, Sorter, Filter, FilterOperator, FilterType, JSONModel) {
-    "use strict";
+sap.ui.define([
+	"sap/ui/core/Messaging",
+	"sap/ui/core/mvc/Controller",
+	"sap/m/MessageToast",
+	"sap/m/MessageBox",
+	"sap/ui/model/Sorter",
+	"sap/ui/model/Filter",
+	"sap/ui/model/FilterOperator",
+	"sap/ui/model/FilterType",
+	"sap/ui/model/json/JSONModel"
+], function (Messaging, Controller, MessageToast, MessageBox, Sorter, Filter, FilterOperator,
+	FilterType, JSONModel) {
+	"use strict";
 
-    // Estensione del controller applicativo
-    return Controller.extend("sap.ui.core.tutorial.odatav4.controller.App", {
-      // Inizializzazione controller
-      onInit: function () {
-        // Modello globale dei messaggi
-        var oMessageModel = Messaging.getMessageModel(),
-          // Binding solo per messaggi tecnici
-          oMessageModelBinding = oMessageModel.bindList(
-            "/",
-            undefined,
-            [],
-            new Filter("technical", FilterOperator.EQ, true),
-          ),
-          // Modello locale per stato interfaccia
-          oViewModel = new JSONModel({
-            busy: false, // UI bloccata
-            hasUIChanges: false, // Modifiche non salvate
-            usernameEmpty: true, // Username vuoto
-            order: 0, // Stato ordinamento
-          });
+	return Controller.extend("sap.ui.core.tutorial.odatav4.controller.App", {
 
-        // Modello stato UI
-        this.getView().setModel(oViewModel, "appView");
+		/**
+		 *  Hook for initializing the controller
+		 */
+		onInit : function () {
+			var oMessageModel = Messaging.getMessageModel(),
+				oMessageModelBinding = oMessageModel.bindList("/", undefined, [],
+					new Filter("technical", FilterOperator.EQ, true)),
+				oViewModel = new JSONModel({
+					busy : false,
+					hasUIChanges : false,
+					usernameEmpty : false,
+					order : 0
+				});
 
-        // Modello messaggi
-        this.getView().setModel(oMessageModel, "message");
+			this.getView().setModel(oViewModel, "appView");
+			this.getView().setModel(oMessageModel, "message");
 
-        // Listener per errori backend
-        oMessageModelBinding.attachChange(this.onMessageBindingChange, this);
+			oMessageModelBinding.attachChange(this.onMessageBindingChange, this);
+			this._bTechnicalErrors = false;
+		},
 
-        // Flag errori tecnici
-        this._bTechnicalErrors = false;
-      },
+		/**
+		 * Create a new entry.
+		 */
+		onCreate : function () {
+			var oList = this.byId("peopleList"),
+				oBinding = oList.getBinding("items"),
+				// Create a new entry through the table's list binding
+				oContext = oBinding.create({Age : "18"});
 
-      // Ricerca utenti per cognome
-      onSearch: function () {
-        // Recupera vista e valore ricerca
-        var oView = this.getView(),
-          sValue = oView.byId("searchField").getValue(),
-          // Filtro "contiene"
-          oFilter = new Filter("LastName", FilterOperator.Contains, sValue);
+			this._setUIChanges(true);
+			this.getView().getModel("appView").setProperty("/usernameEmpty", true);
 
-        // Applica filtro al binding
-        oView.byId("peopleList").getBinding("items").filter(oFilter, FilterType.Application);
-      },
+			// Select and focus the table row that contains the newly created entry
+			oList.getItems().some(function (oItem) {
+				if (oItem.getBindingContext() === oContext) {
+					oItem.focus();
+					oItem.setSelected(true);
+					return true;
+				}
+			});
+		},
 
-      // Ordinamento crescente/decrescente
-      onSort: function () {
-        // Recupera vista
-        var oView = this.getView(),
-          // Stati ordinamento
-          aStates = [undefined, "asc", "desc"],
-          // Testi informativi
-          aStateTextIds = ["sortNone", "sortAscending", "sortDescending"],
-          sMessage,
-          // Stato attuale
-          iOrder = oView.getModel("appView").getProperty("/order");
+		/**
+		 * Delete an entry.
+		 */
+		onDelete : function () {
+			var oContext,
+				oPeopleList = this.byId("peopleList"),
+				oSelected = oPeopleList.getSelectedItem(),
+				sUserName;
 
-        // Cambia stato
-        iOrder = (iOrder + 1) % aStates.length;
-        var sOrder = aStates[iOrder];
+			if (oSelected) {
+				oContext = oSelected.getBindingContext();
+				sUserName = oContext.getProperty("UserName");
+				oContext.delete().then(function () {
+					MessageToast.show(this._getText("deletionSuccessMessage", [sUserName]));
+				}.bind(this), function (oError) {
+					if (oContext === oPeopleList.getSelectedItem().getBindingContext()) {
+						this._setDetailArea(oContext);
+					}
+					this._setUIChanges();
+					if (oError.canceled) {
+						MessageToast.show(this._getText("deletionRestoredMessage", [sUserName]));
+						return;
+					}
+					MessageBox.error(oError.message + ": " + sUserName);
+				}.bind(this));
+				this._setDetailArea();
+				this._setUIChanges();
+			}
+		},
 
-        // Salva stato
-        oView.getModel("appView").setProperty("/order", iOrder);
+		/**
+		 * Lock UI when changing data in the input controls
+		 * @param {sap.ui.base.Event} oEvent - Event data
+		 */
+		onInputChange : function (oEvent) {
+			if (oEvent.getParameter("escPressed")) {
+				this._setUIChanges();
+			} else {
+				this._setUIChanges(true);
+				/**
+				 * Check if the username in the changed table row is empty and set the appView
+				 * property accordingly
+				 */
+				if (oEvent.getSource().getParent().getBindingContext().getProperty("UserName")) {
+					this.getView().getModel("appView").setProperty("/usernameEmpty", false);
+				}
+			}
+		},
 
-        // Applica ordinamento
-        oView
-          .byId("peopleList")
-          .getBinding("items")
-          .sort(sOrder && new Sorter("LastName", sOrder === "desc"));
+		/**
+		 * Refresh the data.
+		 */
+		onRefresh : function () {
+			var oBinding = this.byId("peopleList").getBinding("items");
 
-        // Messaggio utente
-        sMessage = this._getText("sortMessage", [this._getText(aStateTextIds[iOrder])]);
-        MessageToast.show(sMessage);
-      },
+			if (oBinding.hasPendingChanges()) {
+				MessageBox.error(this._getText("refreshNotPossibleMessage"));
+				return;
+			}
+			oBinding.refresh();
+			MessageToast.show(this._getText("refreshSuccessMessage"));
+		},
 
-      // Gestione errori tecnici dal backend
-      onMessageBindingChange: function (oEvent) {
-        // Context dei messaggi
-        var aContexts = oEvent.getSource().getContexts(),
-          aMessages,
-          bMessageOpen = false;
+		/**
+		 * Reset any unsaved changes.
+		 */
+		onResetChanges : function () {
+			this.byId("peopleList").getBinding("items").resetChanges();
+			// If there were technical errors, cancelling changes resets them.
+			this._bTechnicalErrors = false;
+			this._setUIChanges(false);
+		},
 
-        // Nessun messaggio → esce
-        if (bMessageOpen || !aContexts.length) {
-          return;
-        }
+		/**
+		 * Reset the data source.
+		 */
+		onResetDataSource : function () {
+			var oModel = this.getView().getModel(),
+				oOperation = oModel.bindContext("/ResetDataSource(...)");
 
-        // Estrae messaggi
-        aMessages = aContexts.map(function (oContext) {
-          return oContext.getObject();
-        });
+			oOperation.invoke().then(function () {
+					oModel.refresh();
+					MessageToast.show(this._getText("sourceResetSuccessMessage"));
+				}.bind(this), function (oError) {
+					MessageBox.error(oError.message);
+				}
+			);
+		},
 
-        // Rimuove messaggi globali
-        sap.ui.getCore().getMessageManager().removeMessages(aMessages);
+		/**
+		 * Save changes to the source.
+		 */
+		onSave : function () {
+			var fnSuccess = function () {
+					this._setBusy(false);
+					MessageToast.show(this._getText("changesSentMessage"));
+					this._setUIChanges(false);
+				}.bind(this),
+				fnError = function (oError) {
+					this._setBusy(false);
+					this._setUIChanges(false);
+					MessageBox.error(oError.message);
+				}.bind(this);
 
-        // Forza stato modifiche
-        this._setUIChanges(true);
+			this._setBusy(true); // Lock UI until submitBatch is resolved.
+			this.getView().getModel().submitBatch("peopleGroup").then(fnSuccess, fnError);
+			// If there were technical errors, a new save resets them.
+			this._bTechnicalErrors = false;
+		},
 
-        // Segnala errore tecnico
-        this._bTechnicalErrors = true;
+		/**
+		 * Search for the term in the search field.
+		 */
+		onSearch : function () {
+			var oView = this.getView(),
+				sValue = oView.byId("searchField").getValue(),
+				oFilter = new Filter("LastName", FilterOperator.Contains, sValue);
 
-        // Popup errore
-        MessageBox.error(aMessages[0].message, {
-          id: "serviceErrorMessageBox",
+			oView.byId("peopleList").getBinding("items").filter(oFilter, FilterType.Application);
+		},
 
-          onClose: function () {
-            bMessageOpen = false;
-          },
-        });
-        bMessageOpen = true;
-      },
+		/**
+		 * Sort the table according to the last name.
+		 * Cycles between the three sorting states "none", "ascending" and "descending"
+		 */
+		onSort : function () {
+			var oView = this.getView(),
+				aStates = [undefined, "asc", "desc"],
+				aStateTextIds = ["sortNone", "sortAscending", "sortDescending"],
+				iOrder = oView.getModel("appView").getProperty("/order"),
+				sOrder;
 
-      // Creazione nuovo utente
-      onCreate: function () {
-        // Lista e binding
-        var oList = this.byId("peopleList"),
-          oBinding = oList.getBinding("items"),
-          // Nuovo record vuoto
-          oContext = oBinding.create({
-            UserName: "",
-            FirstName: "",
-            LastName: "",
-            Age: "18",
-          });
+			// Cycle between the states
+			iOrder = (iOrder + 1) % aStates.length;
+			sOrder = aStates[iOrder];
 
-        // Segnala modifiche
-        this._setUIChanges();
+			oView.getModel("appView").setProperty("/order", iOrder);
+			oView.byId("peopleList").getBinding("items").sort(sOrder && new Sorter("LastName",
+				sOrder === "desc"));
 
-        // Username non valido
-        this.getView().getModel("appView").setProperty("/usernameEmpty", true);
+			MessageToast.show(this._getText("sortMessage", [this._getText(aStateTextIds[iOrder])]));
+		},
 
-        // Focus su nuova riga
-        oList.getItems().some(function (oItem) {
-          if (oItem.getBindingContext() === oContext) {
-            oItem.focus();
-            oItem.setSelected(true);
-            return true;
-          }
-        });
-      },
+		onMessageBindingChange : function (oEvent) {
+			var aContexts = oEvent.getSource().getContexts(),
+				aMessages,
+				bMessageOpen = false;
 
-      // Gestione modifica input
-      onInputChange: function (oEvt) {
-        // ESC → annulla
-        if (oEvt.getParameter("escPressed")) {
-          this._setUIChanges();
-        } else {
-          // Segnala modifica
-          this._setUIChanges(true);
+			if (bMessageOpen || !aContexts.length) {
+				return;
+			}
 
-          // Controlla username
-          if (oEvt.getSource().getParent().getBindingContext().getProperty("UserName")) {
-            this.getView().getModel("appView").setProperty("/usernameEmpty", false);
-          }
-        }
-      },
+			// Extract and remove the technical messages
+			aMessages = aContexts.map(function (oContext) {
+				return oContext.getObject();
+			});
+			Messaging.removeMessages(aMessages);
 
-      // Aggiornamento dati dal server
-      onRefresh: function () {
-        var oBinding = this.byId("peopleList").getBinding("items");
+			this._setUIChanges(true);
+			this._bTechnicalErrors = true;
+			MessageBox.error(aMessages[0].message, {
+				id : "serviceErrorMessageBox",
+				onClose : function () {
+					bMessageOpen = false;
+				}
+			});
 
-        // Blocca refresh se ci sono modifiche
-        if (oBinding.hasPendingChanges()) {
-          MessageBox.error(this._getText("refreshNotPossibleMessage"));
-          return;
-        }
+			bMessageOpen = true;
+		},
 
-        // Ricarica dati
-        oBinding.refresh();
+		onSelectionChange : function (oEvent) {
+			this._setDetailArea(oEvent.getParameter("listItem").getBindingContext());
+		},
 
-        // Messaggio successo
-        MessageToast.show(this._getText("refreshSuccessMessage"));
-      },
+		/* =========================================================== */
+		/*           end: event handlers                               */
+		/* =========================================================== */
 
-      // Annulla modifiche
-      onResetChanges: function () {
-        // Ripristina stato originale
-        this.byId("peopleList").getBinding("items").resetChanges();
+		/**
+		 * Convenience method for retrieving a translatable text.
+		 * @param {string} sTextId - the ID of the text to be retrieved.
+		 * @param {Array} [aArgs] - optional array of texts for placeholders.
+		 * @returns {string} the text belonging to the given ID.
+		 */
+		_getText : function (sTextId, aArgs) {
+			return this.getOwnerComponent().getModel("i18n").getResourceBundle().getText(sTextId,
+				aArgs);
+		},
 
-        // Reset errori
-        this._bTechnicalErrors = false;
-        this._setUIChanges();
-      },
+		/**
+		 * Set hasUIChanges flag in View Model
+		 * @param {boolean} [bHasUIChanges] - set or clear hasUIChanges
+		 * if bHasUIChanges is not set, the hasPendingChanges-function of the OdataV4 model
+		 * determines the result
+		 */
+		_setUIChanges : function (bHasUIChanges) {
+			if (this._bTechnicalErrors) {
+				// If there is currently a technical error, then force 'true'.
+				bHasUIChanges = true;
+			} else if (bHasUIChanges === undefined) {
+				bHasUIChanges = this.getView().getModel().hasPendingChanges();
+			}
+			var oModel = this.getView().getModel("appView");
 
-      // Reset del DataSource lato backend
-      onResetDataSource : function () {     
-        // Recupera il modello OData principale
-        var oModel = this.getView().getModel(),
-        // Binding verso l’operazione ResetDataSource (function/action OData)
-        oOperation = oModel.bindContext("/ResetDataSource(...)");
-        // Invoca l’operazione sul server
-        oOperation.invoke().then(
-          // Callback in caso di successo
-          function () {
-              // Aggiorna i dati dal backend
-              oModel.refresh();
-              // Messaggio di conferma
-              MessageToast.show(this._getText("sourceResetSuccessMessage"));
-          }.bind(this),
-          // Callback in caso di errore
-          function (oError) {
-              // Mostra errore
-              MessageBox.error(oError.message);
-          }
-        );
-      },
+			oModel.setProperty("/hasUIChanges", bHasUIChanges);
+		},
 
+		/**
+		 * Set busy flag in View Model
+		 * @param {boolean} bIsBusy - set or clear busy
+		 */
+		_setBusy : function (bIsBusy) {
+			var oModel = this.getView().getModel("appView");
 
-      // Salvataggio modifiche (batch)
-      onSave: function () {
-        // Callback successo
-        var fnSuccess = function () {
-          this._setBusy(false);
-          MessageToast.show(this._getText("changesSentMessage"));
-          this._setUIChanges(false);
-        }.bind(this);
+			oModel.setProperty("/busy", bIsBusy);
+		},
 
-        // Callback errore
-        var fnError = function (oError) {
-          this._setBusy(false);
-          this._setUIChanges(false);
-          MessageBox.error(oError.message);
-        }.bind(this);
+		/**
+		 * Toggles the visibility of the detail area
+		 *
+		 * @param {object} [oUserContext] - the current user context
+		 */
+		_setDetailArea : function (oUserContext) {
+			var oDetailArea = this.byId("detailArea"),
+				oLayout = this.byId("defaultLayout"),
+				oSearchField = this.byId("searchField");
 
-        // Blocca UI
-        this._setBusy(true);
+			oDetailArea.setBindingContext(oUserContext || null);
+			// resize view
+			oDetailArea.setVisible(!!oUserContext);
+			oLayout.setSize(oUserContext ? "60%" : "100%");
+			oLayout.setResizable(!!oUserContext);
+			oSearchField.setWidth(oUserContext ? "40%" : "20%");
+		}
+	});
+});
 
-        // Invio batch
-        this.getView().getModel().submitBatch("peopleGroup").then(fnSuccess, fnError);
-        this._bTechnicalErrors = false;
-      },
-
-      // Recupero testi i18n
-      getText: function (sTextId, aArgs) {
-        return this.getOwnerComponent().getModel("i18n").getResourceBundle().getText(sTextId, aArgs);
-      },
-
-      // Gestione stato modifiche
-      setUIChanges: function (bHasUIChanges) {
-        // Errori → forza true
-        if (this._bTechnicalErrors) {
-          bHasUIChanges = true;
-        } else if (bHasUIChanges === undefined) {
-          // Controlla pending changes
-          bHasUIChanges = this.getView().getModel().hasPendingChanges();
-        }
-        var oModel = this.getView().getModel("appView");
-        oModel.setProperty("/hasUIChanges", bHasUIChanges);
-      },
-
-      // Gestione stato busy
-      setBusy: function (bIsBusy) {
-        var oModel = this.getView().getModel("appView");
-        oModel.setProperty("/busy", bIsBusy);
-      },
-    });
-  },
-);
 
 /*
 Step 2
@@ -297,7 +312,7 @@ Step 2
  * sap.ui.model.Sorter e aggiornando il modello tecnico 'appView'.
  */
 
- /*
+/*
 Step 6
  * - Implementata la creazione di nuovi record tramite 'onCreate', con gestione del focus sulla nuova riga.
  * - Inserita la logica di salvataggio centralizzato 'onSave' che utilizza 'submitBatch' per inviare 
@@ -307,3 +322,13 @@ Step 6
  * garantendo che i messaggi del backend vengano visualizzati correttamente all'utente.
  * - Coordinato lo stato dell'interfaccia (busy, hasUIChanges) per riflettere le operazioni di rete asincrone.
  */
+
+/*
+ Step 9
+* - Implementata la cancellazione (Delete) con gestione asincrona e messaggi di ripristino.
+* - Aggiunta un'area di dettaglio dinamica che sfrutta il ridimensionamento del layout
+* e l'Element Binding per visualizzare i dati dell'utente selezionato.
+* - Inserita la funzione di sistema 'onResetDataSource' per ripristinare il database
+* tramite la chiamata a un'Action OData V4.
+* - Ottimizzata la gestione dei messaggi tecnici e dei flag di stato (busy, hasUIChanges).
+*/
