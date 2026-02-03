@@ -347,3 +347,13 @@ Step 6
 * tramite la chiamata a un'Action OData V4.
 * - Ottimizzata la gestione dei messaggi tecnici e dei flag di stato (busy, hasUIChanges).
 */
+
+/*
+STep 10
+* - Implementato 'setKeepAlive' per garantire la disponibilità dei dati di dettaglio 
+* indipendentemente dallo stato della lista principale (paginazione/filtri).
+* - Gestito il rilascio dei contesti obsoleti per ottimizzare le prestazioni.
+* - Sincronizzato il ridimensionamento del layout ResponsiveSplitter e della toolbar
+* in base alla presenza o meno di un utente selezionato.
+* - Aggiunto controllo di sicurezza per evitare errori durante la distruzione della vista.
+*/
