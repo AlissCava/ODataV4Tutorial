@@ -205,6 +205,19 @@ sap.ui.define(
         this._setUIChanges();
       },
 
+      onResetDataSource : function () {
+			var oModel = this.getView().getModel(),
+				oOperation = oModel.bindContext("/ResetDataSource(...)");
+
+        oOperation.invoke().then(function () {
+            oModel.refresh();
+            MessageToast.show(this._getText("sourceResetSuccessMessage"));
+          }.bind(this), function (oError) {
+            MessageBox.error(oError.message);
+          }
+        );
+		  },
+
       // Salvataggio modifiche (batch)
       onSave: function () {
         // Callback successo
